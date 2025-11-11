@@ -31,17 +31,6 @@
             </div>
           </div>
           <div class="form-item">
-            <div class="input-wrapper">
-              <i class="fas fa-shield-alt"></i>
-              <input
-                v-model="form.mfaCode"
-                type="text"
-                placeholder="两步验证码(未开启请留空)"
-                @keyup.enter="handleLogin"
-              />
-            </div>
-          </div>
-          <div class="form-item">
             <button class="login-btn" :disabled="loading" @click="handleLogin">
               {{ loading ? "登录中..." : "登录" }}
             </button>
@@ -96,7 +85,6 @@ const showMfa = ref(true); // 默认显示两步验证输入框
 const form = reactive({
   username: "",
   password: "",
-  mfaCode: "",
 });
 
 // MD5 加密
@@ -114,8 +102,7 @@ const handleLogin = async () => {
     loading.value = true;
     const result = await userApi.login(
       form.username,
-      md5(form.password),
-      form.mfaCode
+      form.password
     );
 
     // 保存 API Key
