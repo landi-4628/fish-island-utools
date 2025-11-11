@@ -53,21 +53,21 @@ import { ArrowRight } from "@element-plus/icons-vue";
 const games = ref([
   {
     name: "《进化-Evolve》",
-    url: "https://fishpi.cn/games/evolve/",
+    url: "https://yucoder.cn/games/evolve/",
     description:
       "在本游戏中，您首先由原生质选择进化为某种智慧生物，然后带领他们走向繁荣昌盛，最后迈向星空，征服宇宙。支持第三方存档云同步（需手动在游戏设定中开启），参与 进化排行榜",
     logo: "https://file.fishpi.cn/evolve/evolved.ico",
   },
   {
     name: "《A Dark Room》",
-    url: "https://fishpi.cn/games/adarkroom/?lang=zh_cn",
+    url: "https://yucoder.cn/games/adarkroom/?lang=zh_cn",
     description:
       "极简主义的游戏杰作，有上世纪 ascii 游戏的遗风。支持存档云同步，参与 摸鱼岛 - 白与画科技 ADR 游戏总分排行榜",
     logo: "https://file.fishpi.cn/adarkroom/img/adr.png",
   },
   {
     name: "Minecraft 私服",
-    url: "https://fishpi.cn/article/1689661528756",
+    url: "https://yucoder.cn/article/1689661528756",
     description:
       "著名 Minecraft 方块放置与探险游戏，社区成员 Yui 搭建的鱼油专属私服。可打怪，可挖矿，可田园，一起来耍吧~♂♂",
     logo: "https://file.fishpi.cn/2023/08/minecraft-71137c15.png",
@@ -81,7 +81,7 @@ const games = ref([
   },
   {
     name: "《Fight》",
-    url: "https://fishpi.cn/games/fight/index.html",
+    url: "https://yucoder.cn/games/fight/index.html",
     description: "一款由社区成员 YARI 自主开发的格斗式游戏。",
     logo: "https://file.fishpi.cn/2022/08/image-39430724.png",
   },
@@ -90,65 +90,65 @@ const games = ref([
     url: "https://p.hancel.org/",
     description:
       "一个非常烧脑的 CTF 类闯关游（酷）戏（刑）。这个游戏的目标就只有一个：进入下一关。在大部分关卡中，你需要利用网页上的提示来找到密码并进入下一关。参与 摸鱼大闯关排行榜",
-    logo: "https://fishpi.cn/images/mofish.png",
+    logo: "https://yucoder.cn/images/mofish.png",
   },
   {
     name: "摸鱼小闯关",
     url: "https://puzzle.iwpz.net/",
     description:
       '一个摸鱼大闯关的"山寨版"，但关卡内容为原创。框架来自 跳跳 参与 摸鱼小闯关排行榜',
-    logo: "https://fishpi.cn/images/mofish.png",
+    logo: "https://yucoder.cn/images/mofish.png",
   },
   {
     name: "汉兜",
-    url: "https://fishpi.cn/games/handle/",
+    url: "https://yucoder.cn/games/handle/",
     description:
       "汉兜是一款猜四字词语的有趣游戏，你有十次的机会猜一个四字词语。每天首次游戏获积分奖励，快来猜猜吧！",
-    logo: "https://fishpi.cn/games/handle/favicon.svg",
+    logo: "https://yucoder.cn/games/handle/favicon.svg",
   },
   {
     name: "人生重开模拟器",
-    url: "https://fishpi.cn/games/lifeRestart/view/",
+    url: "https://yucoder.cn/games/lifeRestart/view/",
     description:
       "如果你不满意现在的人生，那就来重开吧～支持存档云同步，参与 人生重开模拟器成就排行榜",
-    logo: "https://fishpi.cn/images/restart.png",
+    logo: "https://yucoder.cn/images/restart.png",
   },
   {
     name: "Emoji 真假小黄脸",
-    url: "https://fishpi.cn/games/emojiPair",
+    url: "https://yucoder.cn/games/emojiPair",
     description:
       "调皮的小黄脸玩起了真假美猴王的游戏，在众黄脸中找出他们吧！每天首次游戏获积分奖励，封顶30积分，参与 Emoji 真假小黄脸排行榜",
     logo: "emoji:😘",
   },
   {
     name: "围住小猫",
-    url: "https://fishpi.cn/activity/catch-the-cat",
+    url: "https://yucoder.cn/activity/catch-the-cat",
     description: "你能围住这只调皮的小猫么？",
-    logo: "https://fishpi.cn/images/activities/cat.jpg",
+    logo: "https://yucoder.cn/images/activities/cat.jpg",
   },
   {
     name: "2048",
-    url: "https://fishpi.cn/activity/2048",
+    url: "https://yucoder.cn/activity/2048",
     description: "加强版2048，来吧~",
-    logo: "https://fishpi.cn/images/activities/2048.png",
+    logo: "https://yucoder.cn/images/activities/2048.png",
   },
   {
     name: "字",
-    url: "https://fishpi.cn/activity/character",
+    url: "https://yucoder.cn/activity/character",
     description: "写字和打字是完全不一样的体验，请认真感受~",
-    logo: "https://fishpi.cn/images/activities/char.png",
+    logo: "https://yucoder.cn/images/activities/char.png",
   },
   {
     name: "贪吃蛇",
-    url: "https://fishpi.cn/activity/eating-snake",
+    url: "https://yucoder.cn/activity/eating-snake",
     description: "WASD 或方向键控制上下左右，回味一下文曲星的童年吧~",
-    logo: "https://fishpi.cn/images/activities/snak.png",
+    logo: "https://yucoder.cn/images/activities/snak.png",
   },
   {
     name: "五子棋",
-    url: "https://fishpi.cn/activity/gobang",
+    url: "https://yucoder.cn/activity/gobang",
     description: "点击开始，等待对手加入即可开战",
-    logo: "https://fishpi.cn/images/activities/gobang.png",
+    logo: "https://yucoder.cn/images/activities/gobang.png",
   },
 ]);
 

@@ -211,7 +211,7 @@ const form = reactive({
 
 // 刷新验证码
 const refreshCaptcha = () => {
-  captchaUrl.value = `https://fishpi.cn/captcha`;
+  captchaUrl.value = `https://yucoder.cn/captcha`;
 };
 
 // 下一步

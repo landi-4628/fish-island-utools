@@ -145,7 +145,7 @@ const handlePublishSuccess = () => {
 
 // 打开帮助链接
 const openHelpLink = () => {
-  utools.shellOpenExternal("https://fishpi.cn/article/1630938317106");
+  utools.shellOpenExternal("https://yucoder.cn/article/1630938317106");
 };
 
 onMounted(() => {

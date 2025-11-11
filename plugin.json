@@ -2,7 +2,7 @@
   "pluginName": "摸鱼岛",
   "description": "摸鱼岛社区插件，支持文章浏览、聊天室等功能",
   "author": "Your Name",
-  "homepage": "https://fishpi.cn",
+  "homepage": "https://yucoder.cn",
   "version": "0.0.1",
   "logo": "logo.png",
   "preload": "preload.js",

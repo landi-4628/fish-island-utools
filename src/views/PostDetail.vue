@@ -469,10 +469,10 @@
   // 处理 emojiTail 点击事件
   const handleEmojiTailClick = () => {
     if (typeof utools !== 'undefined' && utools.shellOpenExternal) {
-      utools.shellOpenExternal('https://fishpi.cn/settings/function')
+      utools.shellOpenExternal('https://yucoder.cn/settings/function')
     } else {
       console.warn('uTools 不可用，使用默认浏览器打开')
-      window.open('https://fishpi.cn/settings/function', '_blank')
+      window.open('https://yucoder.cn/settings/function', '_blank')
     }
   }
 
@@ -501,7 +501,7 @@
         if (key === '') {
           atUsers.push({
             value: '@participants ',
-            html: `<img src="https://fishpi.cn/images/user-thumbnail.png" style="width: 24px; height: 24px; vertical-align: middle; margin-right: 8px;" />参与者`
+            html: `<img src="https://yucoder.cn/images/user-thumbnail.png" style="width: 24px; height: 24px; vertical-align: middle; margin-right: 8px;" />参与者`
           });
         }
         return atUsers;

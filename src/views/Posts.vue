@@ -280,7 +280,7 @@ onBeforeRouteLeave((to, from, next) => {
 
 // 跳转到发帖页面
 const goToPublish = () => {
-  utools.shellOpenExternal("https://fishpi.cn/pre-post");
+  utools.shellOpenExternal("https://yucoder.cn/pre-post");
 };
 
 onMounted(() => {

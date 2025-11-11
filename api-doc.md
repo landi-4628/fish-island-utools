@@ -1,7 +1,7 @@
 # 摸鱼岛 API 文档
 
 ## 基础信息
-- 基础URL: `https://fishpi.cn`
+- 基础URL: `https://yucoder.cn`
 - 认证方式: API Key
 - 请求格式: JSON
 - 响应格式: JSON

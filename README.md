@@ -75,5 +75,5 @@ npm run build
 
 ## 相关链接
 
-- [摸鱼岛社区](https://fishpi.cn)
+- [摸鱼岛社区](https://yucoder.cn)
 - [uTools 官网](https://u.tools) 

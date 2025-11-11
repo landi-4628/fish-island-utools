@@ -83,8 +83,8 @@ const LINKS = {
   GITHUB: "https://github.com/FishPiOffical/fishpi-uTools",
   ISSUES: "https://github.com/FishPiOffical/fishpi-uTools/issues",
   CURSOR: "https://www.cursor.com",
-  FISHPI: "https://fishpi.cn/",
-  AUTHOR: "https://fishpi.cn/member/otis1026",
+  FISHPI: "https://yucoder.cn/",
+  AUTHOR: "https://yucoder.cn/member/otis1026",
 };
 </script>
 

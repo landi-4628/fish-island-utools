@@ -241,7 +241,7 @@ const fetchRewardStatus = async () => {
   try {
     const res = await userApi.checkLivenessRewardStatus();
     rewardStatus.value = res.isCollectedYesterdayLivenessReward;
-    
+
   } catch (error) {
     console.error("获取奖励状态失败:", error);
   }
@@ -265,7 +265,7 @@ const claimReward = async () => {
 };
 
 const openHelpLink = () => {
-  utools.shellOpenExternal("https://fishpi.cn/article/1683775497629");
+  utools.shellOpenExternal("https://yucoder.cn/article/1683775497629");
 };
 </script>
 

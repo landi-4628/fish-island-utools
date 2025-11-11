@@ -550,7 +550,7 @@
       ) {
         const quote = quoteData.value;
         const oId = quote.oId || "";
-        const quotePrefix = `\n\n ##### 引用 @${quote.userName}${oId ? ` [↩](https://fishpi.cn/cr#chatroom${oId} "跳转至原消息")` : ""
+        const quotePrefix = `\n\n ##### 引用 @${quote.userName}${oId ? ` [↩](https://yucoder.cn/cr#chatroom${oId} "跳转至原消息")` : ""
           }\n\n> ${quote.content}\n\n`;
         content = content + quotePrefix;
       }

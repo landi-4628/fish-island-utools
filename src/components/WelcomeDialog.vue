@@ -57,7 +57,7 @@ const isNewUser = () => {
 };
 
 const openManual = () => {
-  utools.shellOpenExternal("https://fishpi.cn/article/1630569106133");
+  utools.shellOpenExternal("https://yucoder.cn/article/1630569106133");
 };
 
 const handleClose = () => {

@@ -166,12 +166,12 @@ const handleLogin = async () => {
 
 // 跳转到注册页
 const goToRegister = () => {
-  utools.shellOpenExternal("https://fishpi.cn/register?r=otis1026");
+  utools.shellOpenExternal("https://yucoder.cn/index");
 };
 
 // 跳转到忘记密码页面
 const goToForgetPwd = () => {
-  utools.shellOpenExternal("https://fishpi.cn/forget-pwd");
+  utools.shellOpenExternal("https://yucoder.cn/index");
 };
 </script>
 
