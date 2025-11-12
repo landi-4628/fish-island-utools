@@ -30,7 +30,7 @@ import MessageList from "../components/MessageList.vue";
 import RoomChatInput from "../components/RoomChatInput.vue";
 import Sidebar from "../components/Sidebar.vue";
 import { chatApi } from "../api/chat";
-import wsManager from "../utils/websocket";
+import wsManager, { BACKEND_HOST_WS } from "../utils/websocket";
 import { useUserStore } from "../stores/user";
 import { useChatroomStore } from "../stores/chatroom";
 import { userApi } from "../api/user";
@@ -56,6 +56,78 @@ const currentTopic = ref("");
 const showSidebar = ref(true);
 
 const bells = ref([])
+
+const DEFAULT_MESSAGE_PAGE_SIZE = 20;
+
+const transformRoomMessageVoToLegacy = (record) => {
+  if (!record) return null;
+  const message = record.messageWrapper?.message;
+  if (!message) return null;
+
+  const senderInfo = message.sender
+    ? transformUserChatResponse(message.sender)
+    : null;
+
+  const fallbackAvatar = message.sender?.avatar || "";
+  const fallbackName = message.sender?.name || message.sender?.id || "";
+
+  const parseTimestamp = (value) => {
+    if (!value) return undefined;
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? undefined : parsed;
+  };
+
+  const timestamp =
+    parseTimestamp(message.timestamp) ??
+    parseTimestamp(message.sentAt) ??
+    parseTimestamp(message.sentTime);
+
+  const legacyMessage = {
+    oId: message.id || record.id || `${record.roomId || "room"}-${Date.now()}`,
+    id: record.id,
+    roomId:
+      typeof record.roomId !== "undefined"
+        ? record.roomId
+        : message.roomId ?? null,
+    userId: record.userId ?? null,
+    content: message.content ?? "",
+    md: message.content ?? "",
+    messageWrapper: record.messageWrapper,
+    rawMessage: record,
+    client: message.client || message.source || "",
+    timestamp: message.timestamp || message.sentAt || message.sentTime || "",
+    time: timestamp,
+    isHistory: true,
+  };
+
+  if (senderInfo) {
+    legacyMessage.userName = senderInfo.userName || fallbackName;
+    legacyMessage.userNickname = senderInfo.userNickname || fallbackName;
+    legacyMessage.userAvatarURL = senderInfo.userAvatarURL || fallbackAvatar;
+    legacyMessage.userAvatarURL20 =
+      senderInfo.userAvatarURL20 || senderInfo.userAvatarURL || fallbackAvatar;
+    legacyMessage.userAvatarURL48 =
+      senderInfo.userAvatarURL48 ||
+      senderInfo.userAvatarURL ||
+      senderInfo.userAvatarURL20 ||
+      fallbackAvatar;
+    legacyMessage.userAvatarURL210 =
+      senderInfo.userAvatarURL210 ||
+      senderInfo.userAvatarURL ||
+      fallbackAvatar;
+    legacyMessage.userPoint = senderInfo.userPoint;
+    legacyMessage.userIntro = senderInfo.userIntro;
+  } else {
+    legacyMessage.userName = fallbackName;
+    legacyMessage.userNickname = fallbackName;
+    legacyMessage.userAvatarURL = fallbackAvatar;
+    legacyMessage.userAvatarURL20 = fallbackAvatar;
+    legacyMessage.userAvatarURL48 = fallbackAvatar;
+    legacyMessage.userAvatarURL210 = fallbackAvatar;
+  }
+
+  return legacyMessage;
+};
 
 // 获取用户设置
 const getUserSettings = () => {
@@ -365,29 +437,11 @@ const messageHandlers = {
   // 可以根据需要添加其他消息类型的处理器
 };
 
-// 获取聊天节点
-const getChatNode = async () => {
-  try {
-    const response = await chatApi.getChatNode();
-    return response.data;
-  } catch (error) {
-    console.error("获取聊天节点失败:", error);
-    return null;
-  }
-};
-
 // 连接WebSocket
 const connectWebSocket = async () => {
   try {
-    // 先获取节点
-    const response = await chatApi.getChatNode();
-    if (!response.data) {
-      console.error("获取节点失败，无法建立WebSocket连接");
-      return;
-    }
-
-    // 使用获取到的节点URL直接建立连接
-    await wsManager.connect(response.data, {
+    // 直接使用后端地址建立连接
+    await wsManager.connect(BACKEND_HOST_WS, {
       connectionId: "chat-room",
     });
 
@@ -428,12 +482,25 @@ const loadMessages = async (page = 1) => {
   if (isLoadingMore.value || (!hasMoreMessages.value && page !== 1)) return;
   isLoadingMore.value = true;
   try {
-    const response = await chatApi.getChatMessages(page);
-    if (response.data && response.data.length > 0) {
+    const response = await chatApi.getChatMessages({
+      current: page,
+      pageSize: DEFAULT_MESSAGE_PAGE_SIZE,
+      roomId: -1,
+      sortField: "id",
+      sortOrder: "desc",
+    });
+    const pageData = response?.data || {};
+    const records = Array.isArray(pageData.records)
+      ? pageData.records
+      : [];
+    const transformedMessages = records
+      .map(transformRoomMessageVoToLegacy)
+      .filter(Boolean);
+    if (transformedMessages.length > 0) {
       // 过滤黑名单消息
       const blacklist = getCurrentBlacklist();
-      const filteredMessages = response.data.filter((msg) => {
-        if (!msg.userName) return true;
+      const filteredMessages = transformedMessages.filter((msg) => {
+        if (!msg?.userName) return true;
         return !blacklist.some((u) => u.userName === msg.userName);
       });
       // 所有分页的消息都需要翻转
@@ -474,7 +541,15 @@ const loadMessages = async (page = 1) => {
       }
 
       // 检查是否还有更多消息
-      if (filteredMessages.length < 20) {
+      const totalPages = pageData?.pages;
+      const pageSizeFromResponse =
+        pageData?.size ?? DEFAULT_MESSAGE_PAGE_SIZE;
+      if (
+        typeof totalPages === "number" &&
+        totalPages > 0
+      ) {
+        hasMoreMessages.value = page < totalPages;
+      } else if (filteredMessages.length < pageSizeFromResponse) {
         hasMoreMessages.value = false;
       }
     } else {
@@ -499,7 +574,73 @@ const handleSendMessage = async (content) => {
   if (!content || !content.trim()) return;
 
   try {
-    await chatApi.sendMessage(content);
+    const currentUser = userStore.userInfo;
+    const userIpInfo = {}; // 如果有IP信息，可以从其他地方获取
+    const now = Date.now();
+    const userName = currentUser.userName || "游客";
+    const userNickname =
+      currentUser.userNickname || currentUser.userName || "游客";
+    const fallbackAvatar =
+      currentUser.userAvatar ||
+      "https://api.dicebear.com/7.x/avataaars/svg?seed=visitor";
+    const clientName = import.meta.env.VITE_CLIENT || "";
+    
+    const message = {
+      id: `${now}`,
+      content,
+      sender: {
+        id: String(currentUser.id),
+        name: userName,
+        avatar: fallbackAvatar,
+        level: currentUser.level || 1,
+        points: currentUser.points || 0,
+        isAdmin: currentUser.userRole === "admin",
+        isVip: currentUser.vip,
+        region: userIpInfo?.region || "未知地区",
+        country: userIpInfo?.country || "未知国家",
+        avatarFramerUrl: currentUser.avatarFramerUrl,
+        titleId: currentUser.titleId,
+        titleIdList: currentUser.titleIdList,
+      },
+      timestamp: new Date(now).toISOString(),
+      region: userIpInfo?.region || "未知地区",
+      country: userIpInfo?.country || "未知国家",
+    };
+
+    // 由于服务端全局广播会跳过发送人，前端需要立即将消息插入本地列表
+    const localMessage = {
+      oId: message.id,
+      content,
+      md: content,
+      userId: currentUser.id,
+      userName,
+      userNickname,
+      userAvatarURL: fallbackAvatar,
+      userAvatarURL20: fallbackAvatar,
+      userAvatarURL48: fallbackAvatar,
+      userAvatarURL210: fallbackAvatar,
+      userPoint: currentUser.points || 0,
+      userIntro: currentUser.userProfile || "",
+      client: clientName,
+      time: now,
+      timestamp: now,
+      isHistory: false,
+      isSelf: true,
+    };
+
+    messages.value = [...messages.value, localMessage];
+
+    const messageData = JSON.stringify({
+      type: 2, // 聊天消息类型
+      userId: -1,
+      data: {
+        type: "chat",
+        content: {
+          message: message,
+        },
+      },
+    });
+    wsManager.send(messageData, "chat-room");
   } catch (error) {
     console.error("发送消息失败:", error);
   }

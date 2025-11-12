@@ -180,8 +180,20 @@
                   class="group-avatar" />
                 <span v-if="item.groupUsers.length > 2">{{ item.groupUsers.length }}人+1</span>
               </div>
-              <div class="message-footer" v-if="item.userName !== userStore.userInfo?.userName">
-                <ClientInfo :client="item.client" />
+              <div
+                class="message-footer"
+                :class="{
+                  'message-footer-self':
+                    item.userName === userStore.userInfo?.userName,
+                }"
+              >
+                <span class="message-time" v-if="getMessageTime(item)">
+                  {{ getMessageTime(item) }}
+                </span>
+                <ClientInfo
+                  v-if="item.userName !== userStore.userInfo?.userName"
+                  :client="item.client"
+                />
               </div>
             </div>
           </div>
@@ -379,6 +391,23 @@ watch(
   () => props.messages,
   (newMessages, oldMessages) => {
     if (newMessages.length > oldMessages.length) {
+      const oldMessageSet = new Set(oldMessages);
+      const addedMessages = newMessages.filter(
+        (msg) => !oldMessageSet.has(msg)
+      );
+      const onlyHistoryAdded =
+        addedMessages.length > 0 &&
+        oldMessages.length > 0 &&
+        addedMessages.every((msg) => msg?.isHistory);
+
+      if (onlyHistoryAdded) {
+        // 加载历史消息时不自动滚动到底部
+        nextTick(() => {
+          checkIfAtBottom();
+        });
+        return;
+      }
+
       // 获取新增的消息
       const newMsg = newMessages[newMessages.length - 1];
       bells.value = getBells();
@@ -640,7 +669,26 @@ const parseRedPacketMessage = (content) => {
 
 // 格式化时间
 const formatTime = (time) => {
-  return dayjs(time).format("HH:mm:ss");
+  if (!time) return "";
+  const parsed = dayjs(time);
+  return parsed.isValid() ? parsed.format("HH:mm:ss") : "";
+};
+
+const getMessageTime = (message) => {
+  if (!message) return "";
+
+  const timeValue =
+    message.time ??
+    message.timestamp ??
+    message.sentAt ??
+    message.sentTime ??
+    message.createdAt ??
+    message.createTime ??
+    message.messageWrapper?.message?.timestamp ??
+    message.messageWrapper?.message?.sentAt ??
+    message.messageWrapper?.message?.sentTime;
+
+  return formatTime(timeValue);
 };
 
 // 格式化红包类型
@@ -1339,10 +1387,17 @@ const filterBlacklistMessages = () => {
   padding: 0 4px;
   font-size: 12px;
   color: var(--sub-text-color);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .message-footer-self {
-  text-align: right;
+  justify-content: flex-end;
+}
+
+.message-time {
+  font-variant-numeric: tabular-nums;
 }
 
 .client-info {

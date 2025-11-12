@@ -21,21 +21,21 @@
     </div>
     <div class="input-icons">
       <!-- 表情图标 -->
-      <div class="emoji-icon-wrapper">
-        <i class="fas fa-smile icon" @click="openEmojiPicker" title="表情"></i>
-        <EmojiPicker :visible="showEmojiPicker" @select="handleEmojiSelect" @close="showEmojiPicker = false" />
-      </div>
-      <!-- 图片图标 -->
-      <i class="fas fa-image icon" @click="openImagePicker" title="图片"></i>
-      <!-- 红包图标 -->
-      <i class="fas fa-gift icon" @click="openRedPacketDialog" title="红包"></i>
+<!--      <div class="emoji-icon-wrapper">-->
+<!--        <i class="fas fa-smile icon" @click="openEmojiPicker" title="表情"></i>-->
+<!--        <EmojiPicker :visible="showEmojiPicker" @select="handleEmojiSelect" @close="showEmojiPicker = false" />-->
+<!--      </div>-->
+<!--      &lt;!&ndash; 图片图标 &ndash;&gt;-->
+<!--      <i class="fas fa-image icon" @click="openImagePicker" title="图片"></i>-->
+<!--      &lt;!&ndash; 红包图标 &ndash;&gt;-->
+<!--      <i class="fas fa-gift icon" @click="openRedPacketDialog" title="红包"></i>-->
       <!-- 弹幕图标 -->
 <!--      <i class="fas fa-comment-dots icon" @click="openDanmakuDialog" title="弹幕"></i>-->
       <!-- 小尾巴图标 -->
 <!--      <i class="fas fa-pen-fancy icon" @click="openSignatureDialog" title="小尾巴"></i>-->
       <!-- 关键词图标 -->
 
-      <i class="fas fa-bell icon" @click="openBellDialog" title="关键词提醒"></i>
+<!--      <i class="fas fa-bell icon" @click="openBellDialog" title="关键词提醒"></i>-->
     </div>
 
     <div class="input-wrapper">
@@ -535,47 +535,6 @@
   const sendMessage = () => {
     if (message.value.trim()) {
       let content = message.value;
-
-      // 检查是否为图片链接
-      const imageUrlPattern = /^(https?:\/\/.*\.(jpg|jpeg|png|gif|webp))$/i;
-      if (imageUrlPattern.test(content.trim())) {
-        content = `![图片](${content.trim()})`;
-      }
-
-      // 处理引用消息
-      if (
-        quoteData.value &&
-        quoteData.value.userName &&
-        quoteData.value.content
-      ) {
-        const quote = quoteData.value;
-        const oId = quote.oId || "";
-        const quotePrefix = `\n\n ##### 引用 @${quote.userName}${oId ? ` [↩](https://yucoder.cn/cr#chatroom${oId} "跳转至原消息")` : ""
-          }\n\n> ${quote.content}\n\n`;
-        content = content + quotePrefix;
-      }
-
-      // 处理话题引用
-      if (quotedTopic.value) {
-        content = `${content}\n${quotedTopic.value}`;
-      }
-
-      // 添加小尾巴
-      if (signature.value) {
-        const trimmedContent = content.trim();
-        const shouldAddSignature =
-          trimmedContent.length > 0 &&
-          !trimmedContent.startsWith("凌 ") &&
-          !trimmedContent.startsWith("鸽 ") &&
-          !trimmedContent.startsWith("小冰 ") &&
-          !trimmedContent.startsWith("点歌 ") &&
-          !trimmedContent.startsWith("TTS ") &&
-          !trimmedContent.startsWith("朗读 ");
-
-        if (shouldAddSignature) {
-          content = `${content}\n\n> ${signature.value}`;
-        }
-      }
 
       emit("send-message", content);
       message.value = "";

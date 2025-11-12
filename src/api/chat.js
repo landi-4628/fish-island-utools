@@ -7,8 +7,22 @@ export const chatApi = {
   },
 
   // 获取聊天消息
-  getChatMessages(page = 1) {
-    return request.get("/chat-room/more", { page });
+  getChatMessages(params = {}) {
+    const {
+      current = 1,
+      pageSize = 20,
+      roomId = -1,
+      sortField = "id",
+      sortOrder = "desc",
+    } = params;
+
+    return request.post("/api/chat/message/page/vo", {
+      current,
+      pageSize,
+      roomId,
+      sortField,
+      sortOrder,
+    });
   },
 
   // 获取默认表情
