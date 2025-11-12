@@ -202,7 +202,7 @@ class WebSocketManager {
                             if (this.notificationIntervals.has(connectionId)) {
                                 this.stopNotification(this.notificationIntervals.get(connectionId));
                             }
-                            const interval = this.startNotification(data.data?.content || '新消息');
+                            const interval = this.startNotification(data.data?.message?.content || '新消息');
                             if (interval) {
                                 this.notificationIntervals.set(connectionId, interval);
                             }

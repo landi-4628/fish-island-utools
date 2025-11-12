@@ -129,6 +129,33 @@ const transformRoomMessageVoToLegacy = (record) => {
   return legacyMessage;
 };
 
+const transformRealtimeChatMessage = (message) => {
+  if (!message) return null;
+
+  const record = {
+    id: message.id,
+    roomId: message.roomId,
+    userId: message.sender?.id,
+    messageWrapper: {
+      message,
+    },
+  };
+
+  const legacyMessage = transformRoomMessageVoToLegacy(record);
+
+  if (!legacyMessage) return null;
+
+  return {
+    ...legacyMessage,
+    type: "msg",
+    isHistory: false,
+    rawMessage: {
+      type: "chat",
+      data: message,
+    },
+  };
+};
+
 // 获取用户设置
 const getUserSettings = () => {
   const savedSettings = utools.dbStorage.getItem("fishpi_settings") || {};
@@ -287,6 +314,25 @@ const messageHandlers = {
     // 同步到本地ref
     onlineUsers.value = transformedUsers;
     currentTopic.value = data.discussing || "";
+  },
+  chat: (data) => {
+    const messagePayload = data?.data?.message || data?.message;
+    if (!messagePayload) {
+      return;
+    }
+
+    const legacyMessage = transformRealtimeChatMessage(messagePayload);
+
+    if (!legacyMessage) {
+      return;
+    }
+
+    legacyMessage.rawMessage = {
+      ...(legacyMessage.rawMessage || {}),
+      event: data,
+    };
+
+    messageHandlers.msg(legacyMessage);
   },
   msg: (data) => {
     // 确保消息有必要字段，并添加到消息列表
@@ -454,9 +500,16 @@ const connectWebSocket = async () => {
 // 处理接收到的消息
 const handleMessage = (data) => {
   // 判断是否为黑名单用户
-  if (data.userName) {
+  const incomingUserName =
+    data.userName ||
+    data?.sender?.userName ||
+    data?.sender?.name ||
+    data?.data?.message?.sender?.userName ||
+    data?.data?.message?.sender?.name;
+
+  if (incomingUserName) {
     const blacklist = getCurrentBlacklist();
-    if (blacklist.some((u) => u.userName === data.userName)) {
+    if (blacklist.some((u) => u.userName === incomingUserName)) {
       return; // 黑名单消息直接丢弃
     }
   }
