@@ -12,6 +12,7 @@ import Dashboard from "../views/Dashboard.vue";
 import PrivateChat from "../views/PrivateChat.vue";
 import UserProfile from "../views/UserProfile.vue";
 import Games from "../views/Games.vue";
+import HotPosts from "../views/HotPosts.vue";
 
 const routes = [
   {
@@ -61,6 +62,11 @@ const routes = [
         path: "/settings",
         name: "Settings",
         component: Settings,
+      },
+      {
+        path: "/hot-posts",
+        name: "HotPosts",
+        component: HotPosts,
       },
       {
         path: "/post/:id",

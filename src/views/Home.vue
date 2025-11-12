@@ -157,6 +157,7 @@ const savedAccounts = ref([]);
 
 const navItems = [
   { path: "/", name: "鱼塘首页", icon: "fas fa-house" },
+  { path: "/hot-posts", name: "帖子热榜", icon: "fas fa-fire" },
   // { path: "/chatroom", name: "鱼塘聊天", icon: "fas fa-comments" },
   // { path: "/private-chat", name: "康康私信", icon: "fas fa-envelope" },
   // { path: "/posts", name: "康康帖子", icon: "fas fa-book-reader" },
