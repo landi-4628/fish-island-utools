@@ -1229,6 +1229,8 @@ const renderNestedQuotesFromMd = (md) => {
 
 
 // 获取在线用户列表
+let onlineUsersPollingTimer = null;
+
 const fetchOnlineUsers = async () => {
   try {
     const response = await chatApi.getOnlineUserListUsingGet();
@@ -1265,6 +1267,7 @@ onMounted(() => {
 
   // 获取在线用户列表
   fetchOnlineUsers();
+  onlineUsersPollingTimer = setInterval(fetchOnlineUsers, 30000);
 
   connectWebSocket();
   loadMessages();
@@ -1282,6 +1285,10 @@ onMounted(() => {
 
 onUnmounted(() => {
   wsManager.close("chat-room");
+  if (onlineUsersPollingTimer) {
+    clearInterval(onlineUsersPollingTimer);
+    onlineUsersPollingTimer = null;
+  }
   // 移除事件监听
   window.removeEventListener("fishpi:account-switched", handleAccountSwitch);
   window.removeEventListener(
