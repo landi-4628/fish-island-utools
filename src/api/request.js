@@ -36,11 +36,21 @@ class Request {
                 apiKey: apiKey,
               };
             } else {
-              // 其他 POST 请求将 apiKey 添加到请求体中
-              config.data = {
-                ...config.data,
-                apiKey: apiKey,
-              };
+              // POST/PUT/DELETE 等请求
+              // 如果 data 是字符串，将 apiKey 添加到 URL 参数中
+              // 如果 data 是对象，将 apiKey 添加到请求体中
+              if (typeof config.data === "string") {
+                // 字符串类型的 body，将 apiKey 添加到 URL 参数中
+                config.url = `${config.url}${
+                  config.url.includes("?") ? "&" : "?"
+                }apiKey=${apiKey}`;
+              } else {
+                // 对象类型的 body，将 apiKey 添加到请求体中
+                config.data = {
+                  ...config.data,
+                  apiKey: apiKey,
+                };
+              }
             }
           }
         }
@@ -131,8 +141,31 @@ class Request {
   }
 
   // POST 请求
-  async post(path, data = {}) {
-    return this.instance.post(path, data);
+  async post(path, data = {}, config = {}) {
+    return this.instance.post(path, data, config);
+  }
+
+  // POST 请求（text/plain Content-Type）
+  async postText(path, data = "") {
+    // 使用 text/plain Content-Type 发送纯字符串
+    // 注意：axios 默认会将字符串 JSON 序列化（添加引号），
+    // 但当我们设置 Content-Type 为 text/plain 时，axios 应该直接发送字符串
+    // 为了确保正确性，我们使用 transformRequest 确保直接返回字符串
+    return this.instance.post(path, data, {
+      headers: {
+        "Content-Type": "text/plain;charset=UTF-8",
+      },
+      transformRequest: [
+        // 移除默认的 transformRequest，直接返回字符串
+        (data) => {
+          // 如果 data 是字符串，直接返回（不添加引号）
+          // 如果 data 是其他类型，转换为字符串
+          return typeof data === "string" ? data : String(data);
+        },
+      ],
+      // 禁用默认的 transformRequest（JSON 序列化）
+      // 通过设置 transformRequest 数组来覆盖默认行为
+    });
   }
 
   // PUT 请求

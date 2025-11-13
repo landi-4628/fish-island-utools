@@ -72,7 +72,9 @@ const convertLegacyImageTags = (input = "") => {
     if (!normalized) {
       return "";
     }
-    return `<img src="${normalized}" alt="图片" />`;
+    // 转义 URL 中的引号，防止 XSS（但保留 URL 中的其他字符，如 &、? 等）
+    const safeUrl = normalized.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    return `<img src="${safeUrl}" alt="图片" style="max-width: 200px; height: auto; border-radius: 8px; margin: 4px 0; cursor: pointer; display: block;" />`;
   });
 };
 
@@ -842,10 +844,12 @@ const handleSendMessage = async (messageData) => {
     };
 
     // 由于服务端全局广播会跳过发送人，前端需要立即将消息插入本地列表
+    // 将 [img]url[/img] 格式转换为 <img> 标签用于显示
+    const displayContent = convertLegacyImageTags(content);
     const localMessage = {
       oId: message.id,
-      content,
-      md: content,
+      content: displayContent, // 用于显示的内容（已转换为 <img> 标签）
+      md: content, // 保留原始格式用于其他用途
       userId: currentUser.id,
       userName,
       userNickname,
@@ -884,25 +888,109 @@ const handleSendMessage = async (messageData) => {
 
 // 处理选择表情
 const handleSelectEmoji = (emoji) => {
-  if (typeof emoji === "string") {
-    // 默认表情已经在 RoomChatInput 中处理了
-    return;
-  }
+  try {
+    let imageUrl = "";
+    
+    // 判断表情类型
+    if (typeof emoji === "string") {
+      // 字符串类型：可能是默认表情（emoji符号）或图片URL
+      // 检查是否是图片URL（以 http:// 或 https:// 开头）
+      const imageUrlPattern = /^https?:\/\//i;
+      if (imageUrlPattern.test(emoji.trim())) {
+        // 是图片URL，通过WebSocket发送
+        imageUrl = emoji.trim();
+      } else {
+        // 是默认表情符号，在 RoomChatInput 中处理（插入到输入框）
+        // 这里不做处理，让 RoomChatInput 处理
+        return;
+      }
+    } else {
+      // 对象类型：表情包对象（支持 cover 和 emoticonSrc）
+      imageUrl = emoji.cover || emoji.emoticonSrc || emoji;
+    }
+    
+    if (!imageUrl) {
+      ElMessage.warning("无法获取表情包地址");
+      return;
+    }
 
-  // 处理表情包 - 发送 Markdown 格式的图片表情
-  const markdownEmoji = `![图片表情](${emoji.cover})`;
-  chatApi
-    .sendMessage(markdownEmoji)
-    .then(() => {
-      // 重新加载消息列表
-      messages.value = [];
-      currentPage.value = 1;
-      hasMoreMessages.value = true;
-      loadMessages(1);
-    })
-    .catch((error) => {
-      console.error("发送表情包消息失败:", error);
+    // 构建 [img]url[/img] 格式的图片表情
+    const imageEmojiContent = `[img]${imageUrl}[/img]`;
+
+    // 通过 WebSocket 发送表情包消息（与发送红包逻辑一致）
+    const currentUser = userStore.userInfo;
+    const userIpInfo = {}; // 如果有IP信息，可以从其他地方获取
+    const now = Date.now();
+    const userName = currentUser.userName || "游客";
+    const userNickname =
+      currentUser.userNickname || currentUser.userName || "游客";
+    const fallbackAvatar =
+      currentUser.userAvatar ||
+      "https://api.dicebear.com/7.x/avataaars/svg?seed=visitor";
+    const clientName = import.meta.env.VITE_CLIENT || "";
+
+    const message = {
+      id: `${now}`,
+      content: imageEmojiContent,
+      sender: {
+        id: String(currentUser.id),
+        name: userName,
+        avatar: fallbackAvatar,
+        level: currentUser.level || 1,
+        points: currentUser.points || 0,
+        isAdmin: currentUser.userRole === "admin",
+        isVip: currentUser.vip,
+        region: userIpInfo?.region || "未知地区",
+        country: userIpInfo?.country || "未知国家",
+        avatarFramerUrl: currentUser.avatarFramerUrl,
+        titleId: currentUser.titleId,
+        titleIdList: currentUser.titleIdList,
+      },
+      timestamp: new Date(now).toISOString(),
+      region: userIpInfo?.region || "未知地区",
+      country: userIpInfo?.country || "未知国家",
+    };
+
+    // 由于服务端全局广播会跳过发送人，前端需要立即将消息插入本地列表
+    // 将 [img]url[/img] 格式转换为 <img> 标签用于显示
+    const displayContent = convertLegacyImageTags(imageEmojiContent);
+    const localMessage = {
+      oId: message.id,
+      content: displayContent, // 用于显示的内容（已转换为 <img> 标签）
+      md: imageEmojiContent, // 保留原始格式用于其他用途
+      userId: currentUser.id,
+      userName,
+      userNickname,
+      userAvatarURL: fallbackAvatar,
+      userAvatarURL20: fallbackAvatar,
+      userAvatarURL48: fallbackAvatar,
+      userAvatarURL210: fallbackAvatar,
+      userPoint: currentUser.points || 0,
+      userIntro: currentUser.userProfile || "",
+      client: clientName,
+      time: now,
+      timestamp: now,
+      isHistory: false,
+      isSelf: true,
+    };
+
+    messages.value = [...messages.value, localMessage];
+
+    const messageData = JSON.stringify({
+      type: 2, // 聊天消息类型
+      userId: -1,
+      data: {
+        type: "chat",
+        content: {
+          message: message,
+        },
+      },
     });
+    wsManager.send(messageData, "chat-room");
+  } catch (error) {
+    console.error("发送表情包失败:", error);
+    ElMessage.error(error.message || "发送表情包失败");
+  }
 };
 
 // 处理选择图片
@@ -1045,49 +1133,29 @@ const handleAddEmoji = async (item) => {
     }
 
     const imgSrc = match[1];
-    // 获取当前表情包列表
-    const res = await userApi.getEmotionPack("emojis");
-
-    if (res.code !== 0) {
-      ElMessage.error("获取表情包列表失败");
-      return;
-    }
-
-    // 解析表情包数据，处理空数据的情况
-    let urls = [];
-    try {
-      urls = res.data ? JSON.parse(res.data) : [];
-      // 确保urls是数组
-      if (!Array.isArray(urls)) {
-        urls = [];
-      }
-    } catch (e) {
-      console.warn("解析表情包数据失败，将使用空数组", e);
-      urls = [];
-    }
-
-    // 检查是否已存在相同的表情
-    if (urls.includes(imgSrc)) {
-      ElMessage.warning("该表情已存在");
-      return;
-    }
-
-    // 添加新的图片URL
-    urls.push(imgSrc);
-
-    // 同步到服务器
-    const syncRes = await userApi.syncEmotionPack(
-      "emojis",
-      JSON.stringify(urls)
-    );
-    if (syncRes.code === 0) {
+    
+    // 使用新API添加收藏表情包
+    const addRes = await userApi.addEmoticonFavour(imgSrc);
+    if (addRes.code === 0) {
       ElMessage.success("添加表情成功");
     } else {
-      ElMessage.error("同步表情包失败");
+      // 检查是否是重复添加
+      const errorMsg = addRes.message || "添加表情失败";
+      if (errorMsg.includes("已存在") || errorMsg.includes("重复") || errorMsg.includes("exist")) {
+        ElMessage.warning("该表情已存在");
+      } else {
+        ElMessage.error(errorMsg);
+      }
     }
   } catch (error) {
     console.error("添加表情失败:", error);
-    ElMessage.error("添加表情失败：" + (error.message || "未知错误"));
+    const errorMsg = error.message || "未知错误";
+    // 检查是否是重复添加的错误
+    if (errorMsg.includes("已存在") || errorMsg.includes("重复") || errorMsg.includes("exist")) {
+      ElMessage.warning("该表情已存在");
+    } else {
+      ElMessage.error("添加表情失败：" + errorMsg);
+    }
   }
 };
 

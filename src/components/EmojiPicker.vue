@@ -19,7 +19,7 @@
         </span>
       </div>
       <div v-else-if="currentTab === 'packs'" class="emoji-pack-grid-wrapper">
-        <div class="emoji-pack-grid">
+        <div class="emoji-pack-grid" @scroll="handlePacksScroll">
           <div class="emoji-pack-item upload-btn" @click="handleUpload">
             <i class="fas fa-plus"></i>
             <span>添加表情包</span>
@@ -31,12 +31,20 @@
           >
             <img
               :src="pack.cover"
-              :alt="pack.name"
+              :alt="pack.name || '表情包'"
               @click="selectEmotionPack(pack)"
             />
             <div class="delete-btn" @click.stop="handleDelete(pack)">
               <i class="fas fa-trash"></i>
             </div>
+          </div>
+          <div
+            v-if="isLoadingPacks && emotionPacks.length > 0"
+            class="emoji-pack-loading"
+            style="grid-column: 1 / -1; text-align: center; padding: 12px; color: var(--sub-text-color);"
+          >
+            <i class="fas fa-spinner fa-spin"></i>
+            <span style="margin-left: 8px;">加载中...</span>
           </div>
         </div>
       </div>
@@ -143,6 +151,12 @@ const defaultEmotions = ref([]);
 const emotionPacks = ref([]);
 const searchKeyword = ref("");
 
+// 分页相关
+const currentPage = ref(1);
+const pageSize = ref(50); // 每页加载50个表情包
+const hasMore = ref(true);
+const isLoadingPacks = ref(false);
+
 // 在线表情包搜索相关
 const onlineSearchKeyword = ref("");
 const onlineEmojiSearchResults = ref([]);
@@ -185,18 +199,65 @@ const fetchDefaultEmotions = async () => {
 };
 
 // 获取表情包列表
-const fetchEmotionPacks = async () => {
+const fetchEmotionPacks = async (isLoadMore = false) => {
+  if (isLoadingPacks.value) return;
+  if (!isLoadMore && !hasMore.value) return;
+  
+  isLoadingPacks.value = true;
   try {
-    const res = await userApi.getEmotionPack("emojis");
-    if (res.code === 0) {
-      const urls = JSON.parse(res.data);
-      emotionPacks.value = urls.map((url, index) => ({
-        id: index,
-        cover: url,
+    if (!isLoadMore) {
+      // 重置分页状态
+      currentPage.value = 1;
+      emotionPacks.value = [];
+      hasMore.value = true;
+    }
+    
+    const res = await userApi.listEmoticonFavourByPage({
+      current: currentPage.value,
+      pageSize: pageSize.value,
+      sortField: "createTime",
+      sortOrder: "desc",
+    });
+    
+    if (res.code === 0 && res.data) {
+      const records = res.data.records || [];
+      const newPacks = records.map((item) => ({
+        id: item.id,
+        cover: item.emoticonSrc,
+        emoticonSrc: item.emoticonSrc,
       }));
+      
+      if (isLoadMore) {
+        emotionPacks.value = [...emotionPacks.value, ...newPacks];
+      } else {
+        emotionPacks.value = newPacks;
+      }
+      
+      // 检查是否还有更多数据
+      const total = res.data.total || 0;
+      const current = res.data.current || 1;
+      const pages = res.data.pages || 1;
+      
+      // 判断是否还有更多数据：当前页小于总页数，或者当前加载的数据少于总数
+      hasMore.value = current < pages && emotionPacks.value.length < total;
+      
+      // 如果有更多数据，准备加载下一页
+      if (hasMore.value) {
+        currentPage.value = current + 1;
+      } else {
+        // 没有更多数据了，保持当前页
+        currentPage.value = current;
+      }
+    } else {
+      ElMessage.error(res.message || "获取表情包列表失败");
+      hasMore.value = false;
     }
   } catch (error) {
     console.error("获取表情包失败:", error);
+    ElMessage.error("获取表情包列表失败");
+    hasMore.value = false;
+  } finally {
+    isLoadingPacks.value = false;
   }
 };
 
@@ -228,20 +289,25 @@ const handleUpload = () => {
     const file = e.target.files[0];
     if (file) {
       try {
+        // 先上传图片
         const uploadRes = await userApi.uploadImage(file);
         if (uploadRes.code === 0 && uploadRes.data.succMap) {
           const newUrl = uploadRes.data.succMap[file.name];
           if (newUrl) {
-            const newPacks = [
-              ...emotionPacks.value,
-              { id: emotionPacks.value.length, cover: newUrl },
-            ];
-            await userApi.syncEmotionPack(
-              "emojis",
-              JSON.stringify(newPacks.map((pack) => pack.cover))
-            );
-            emotionPacks.value = newPacks;
+            // 使用新API添加收藏
+            const addRes = await userApi.addEmoticonFavour(newUrl);
+            if (addRes.code === 0) {
+              ElMessage.success("添加表情包成功");
+              // 重新加载第一页
+              currentPage.value = 1;
+              hasMore.value = true;
+              await fetchEmotionPacks(false);
+            } else {
+              ElMessage.error(addRes.message || "添加表情包失败");
+            }
           }
+        } else {
+          ElMessage.error(uploadRes.message || "上传失败");
         }
       } catch (error) {
         console.error("上传表情包失败:", error);
@@ -253,15 +319,23 @@ const handleUpload = () => {
 };
 
 const handleDelete = async (pack) => {
+  if (!pack.id) {
+    ElMessage.warning("无法删除：缺少表情包ID");
+    return;
+  }
+  
   try {
-    const newPacks = emotionPacks.value.filter((p) => p.id !== pack.id);
-    await userApi.syncEmotionPack(
-      "emojis",
-      JSON.stringify(newPacks.map((p) => p.cover))
-    );
-    emotionPacks.value = newPacks;
+    const deleteRes = await userApi.deleteEmoticonFavour(pack.id);
+    if (deleteRes.code === 0) {
+      ElMessage.success("删除表情包成功");
+      // 从列表中移除
+      emotionPacks.value = emotionPacks.value.filter((p) => p.id !== pack.id);
+    } else {
+      ElMessage.error(deleteRes.message || "删除表情包失败");
+    }
   } catch (error) {
     console.error("删除表情包失败:", error);
+    ElMessage.error(error.message || "删除表情包失败");
   }
 };
 
@@ -319,7 +393,7 @@ const handleOnlineImageError = (e) => {
   e.target.style.display = "none";
 };
 
-// 滚动加载更多
+// 滚动加载更多（在线搜索）
 const handleOnlineScroll = (e) => {
   const el = e.target;
   if (
@@ -328,6 +402,18 @@ const handleOnlineScroll = (e) => {
     onlineSearchHasMore.value
   ) {
     searchOnlineEmojis(true);
+  }
+};
+
+// 滚动加载更多（表情包列表）
+const handlePacksScroll = (e) => {
+  const el = e.target;
+  if (
+    el.scrollTop + el.clientHeight >= el.scrollHeight - 10 &&
+    !isLoadingPacks.value &&
+    hasMore.value
+  ) {
+    fetchEmotionPacks(true);
   }
 };
 

@@ -21,19 +21,18 @@
     </div>
     <div class="input-icons">
 <!--      &lt;!&ndash; 表情图标 &ndash;&gt;-->
-<!--      <div class="emoji-icon-wrapper">-->
-<!--        <i class="fas fa-smile icon" @click="openEmojiPicker" title="表情"></i>-->
-<!--        <EmojiPicker :visible="showEmojiPicker" @select="handleEmojiSelect" @close="showEmojiPicker = false" />-->
-<!--      </div>-->
+      <div class="emoji-icon-wrapper">
+        <i class="fas fa-smile icon" @click="openEmojiPicker" title="表情"></i>
+        <EmojiPicker :visible="showEmojiPicker" @select="handleEmojiSelect" @close="showEmojiPicker = false" />
+      </div>
       <!-- 图片图标 -->
-      <i class="fas fa-image icon" @click="openImagePicker" title="图片"></i>
+<!--      <i class="fas fa-image icon" @click="openImagePicker" title="图片"></i>-->
       <!-- 红包图标 -->
       <i class="fas fa-gift icon" @click="openRedPacketDialog" title="红包"></i>
 <!--       弹幕图标 -->
 <!--      <i class="fas fa-comment-dots icon" @click="openDanmakuDialog" title="弹幕"></i>-->
 <!--       小尾巴图标 -->
 <!--      <i class="fas fa-pen-fancy icon" @click="openSignatureDialog" title="小尾巴"></i>-->
-       关键词图标
 
       <i class="fas fa-bell icon" @click="openBellDialog" title="关键词提醒"></i>
     </div>
@@ -444,32 +443,17 @@
     if (emojiSearchAutoCloseTimer.value) {
       clearTimeout(emojiSearchAutoCloseTimer.value);
     }
-    // 创建图片元素
-    const img = document.createElement("img");
-    img.src = image.middleURL || image.thumbURL;
-    img.style.maxWidth = "120px";
-    img.style.verticalAlign = "text-bottom";
-    img.style.margin = "0 4px";
-    img.style.objectFit = "contain";
-    img.style.cursor = "pointer";
-
-    // 在光标位置插入图片
-    const inputContent = textareaRef.value;
-    const currentContent = inputContent.innerHTML;
-    inputContent.innerHTML = currentContent + img.outerHTML;
-
-    // 更新输入框内容
-    message.value = inputContent.innerHTML;
-
-    // 保持焦点并将光标移到末尾
-    inputContent.focus();
-    const range = document.createRange();
-    const sel = window.getSelection();
-    range.selectNodeContents(inputContent);
-    range.collapse(false);
-    sel.removeAllRanges();
-    sel.addRange(range);
-
+    
+    // 获取图片URL
+    const imageUrl = image.middleURL || image.thumbURL;
+    if (!imageUrl) {
+      return;
+    }
+    
+    // 通过WebSocket直接发送（不在输入框中插入）
+    // 发送给父组件，让父组件通过WebSocket发送
+    emit("select-emoji", imageUrl);
+    
     // 关闭表情包搜索
     showEmojiSearch.value = false;
   };
@@ -532,9 +516,39 @@
     textareaRef.value?.focus();
   };
 
+  // 将 HTML 内容中的 <img> 标签转换为 [img]url[/img] 格式
+  const convertImgTagsToLegacyFormat = (htmlContent) => {
+    if (!htmlContent) return htmlContent;
+
+    // 使用正则表达式替换所有 <img> 标签为 [img]url[/img] 格式
+    let result = htmlContent.replace(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi, (match, src) => {
+      return `[img]${src}[/img]`;
+    });
+
+    // 将 <br> 和 <br/> 标签转换为换行符
+    result = result.replace(/<br\s*\/?>/gi, "\n");
+
+    // 将 <div> 标签转换为换行符（contenteditable 中 div 通常表示换行）
+    result = result.replace(/<\/div>/gi, "\n");
+    result = result.replace(/<div[^>]*>/gi, "");
+
+    // 移除其他 HTML 标签，但保留文本内容
+    const tempDiv = document.createElement("div");
+    tempDiv.innerHTML = result;
+    result = tempDiv.textContent || tempDiv.innerText || "";
+
+    // 清理多余的换行（连续多个换行保留最多两个）
+    result = result.replace(/\n{3,}/g, "\n\n");
+
+    return result.trim();
+  };
+
   const sendMessage = () => {
     if (message.value.trim()) {
       let content = message.value;
+
+      // 将 HTML 中的 <img> 标签转换为 [img]url[/img] 格式
+      content = convertImgTagsToLegacyFormat(content);
 
       // 将引用消息数据一起发送
       const messageData = {
@@ -570,33 +584,14 @@
   // 处理表情选择
   const handleEmojiSelect = (emoji) => {
     if (typeof emoji === "string") {
-      // 只要是 http(s) 链接都插入图片
+      // 检查是否是图片URL（以 http:// 或 https:// 开头）
       const imageUrlPattern = /^https?:\/\//i;
       if (imageUrlPattern.test(emoji.trim())) {
-        // 创建图片元素
-        const img = document.createElement("img");
-        img.src = emoji.trim();
-        img.style.maxWidth = "120px";
-        img.style.verticalAlign = "text-bottom";
-        img.style.margin = "0 4px";
-        img.style.objectFit = "contain";
-        img.style.cursor = "pointer";
-
-        // 在光标位置插入图片
-        const inputContent = textareaRef.value;
-        const currentContent = inputContent.innerHTML;
-        inputContent.innerHTML = currentContent + img.outerHTML;
-        // 更新输入框内容
-        message.value = inputContent.innerHTML;
-        // 保持焦点并将光标移到末尾
-        inputContent.focus();
-        const range = document.createRange();
-        const sel = window.getSelection();
-        range.selectNodeContents(inputContent);
-        range.collapse(false);
-        sel.removeAllRanges();
-        sel.addRange(range);
+        // 是图片URL，通过WebSocket直接发送（不在输入框中插入）
+        // 发送给父组件，让父组件通过WebSocket发送
+        emit("select-emoji", emoji.trim());
       } else {
+        // 是默认表情符号，插入到输入框
         const inputContent = textareaRef.value;
         const currentContent = inputContent.innerHTML;
         inputContent.innerHTML = currentContent + emoji;
@@ -612,6 +607,7 @@
         sel.addRange(range);
       }
     } else {
+      // 对象类型：表情包对象，通过WebSocket直接发送
       emit("select-emoji", emoji);
     }
   };
@@ -630,9 +626,9 @@
           if (uploadRes.code === 0 && uploadRes.data.succMap) {
             const newUrl = uploadRes.data.succMap[file.name];
             if (newUrl) {
-              // 发送图片消息
-              const markdownImage = `![图片](${newUrl})`;
-              emit("send-message", markdownImage);
+              // 发送图片消息，使用 [img]url[/img] 格式
+              const imageMessage = `[img]${newUrl}[/img]`;
+              emit("send-message", imageMessage);
             }
           }
         } catch (error) {

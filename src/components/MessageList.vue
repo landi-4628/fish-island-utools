@@ -81,8 +81,24 @@
                   <span class="quoted-message-author">{{ item.quotedMessage.sender?.name || '未知用户' }}</span>
                 </div>
                 <div class="quoted-message-content">
-                  <span v-if="!isImageInContent(item.quotedMessage.content)">{{ getQuotedMessageText(item.quotedMessage.content) }}</span>
-                  <span v-else class="quoted-image-indicator">[图片]</span>
+                  <!-- 如果是红包，显示红包卡片 -->
+                  <div v-if="isQuotedMessageRedPacket(item.quotedMessage)" class="quoted-red-packet">
+                    <div class="quoted-red-packet-icon">🧧</div>
+                    <div class="quoted-red-packet-info">
+                      <div class="quoted-red-packet-type">红包</div>
+                      <div class="quoted-red-packet-msg">
+                        {{ (() => {
+                          const redPacket = parseQuotedMessageRedPacket(item.quotedMessage);
+                          return redPacket?.msg || redPacket?.detail?.name || '红包';
+                        })() }}
+                      </div>
+                    </div>
+                  </div>
+                  <!-- 否则显示处理后的内容（可能包含图片和文本） -->
+                  <div v-else class="quoted-message-body" 
+                    v-html="getProcessedQuotedMessageContent(item.quotedMessage)"
+                    @click="(e) => { handleImageClick(e); handleLinkClick(e); }"
+                    @load="handleImageLoad"></div>
                 </div>
               </div>
               <div style="display: flex; align-items: flex-end">
@@ -1355,8 +1371,9 @@ let previewWindow = null;
 const handleImageClick = async (e) => {
   if (e.target.tagName === "IMG") {
     const imgSrc = e.target.src;
+    // 收集所有图片，包括消息中的图片和引用消息中的图片
     const allImages = Array.from(
-      document.querySelectorAll(".message-text img")
+      document.querySelectorAll(".message-text img, .quoted-image-content img, .quoted-text-content img")
     ).map((img) => ({
       src: img.src,
     }));
@@ -1489,7 +1506,7 @@ const handleImageLoad = () => {
 // 检查内容中是否包含图片
 const isImageInContent = (content) => {
   if (!content || typeof content !== 'string') return false;
-  return /\<img[^>]+src=/.test(content) || /!\[.*?\]\(.*?\)/.test(content);
+  return /\<img[^>]+src=/.test(content) || /!\[.*?\]\(.*?\)/.test(content) || /\[img\]/i.test(content);
 };
 
 // 获取引用消息的文本内容
@@ -1507,6 +1524,95 @@ const getQuotedMessageText = (content) => {
     const maxLength = 50;
     return content.length > maxLength ? content.slice(0, maxLength) + '...' : content;
   }
+};
+
+// 转换旧格式的 [img]url[/img] 标记为标准 img 标签
+const convertLegacyImageTags = (input = "") => {
+  if (typeof input !== "string" || !input) {
+    return input;
+  }
+  return input.replace(/\[img\]\s*([\s\S]*?)\s*\[\/img\]/gi, (_match, url) => {
+    const normalized = String(url || "").trim();
+    if (!normalized) {
+      return "";
+    }
+    // 转义 URL 中的引号，防止 XSS（但保留 URL 中的其他字符，如 &、? 等）
+    const safeUrl = normalized.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    return `<img src="${safeUrl}" alt="图片" style="max-width: 150px; height: auto; border-radius: 6px; margin: 4px 0; cursor: pointer; display: block;" />`;
+  });
+};
+
+// 转换旧格式的 [redpacket]id[/redpacket] 标记为 JSON 格式
+const convertLegacyRedPacketTags = (input = "") => {
+  if (typeof input !== "string" || !input) {
+    return input;
+  }
+  // 匹配 [redpacket]...[/redpacket] 格式
+  const redPacketMatch = input.match(/\[redpacket\]\s*([\s\S]*?)\s*\[\/redpacket\]/i);
+  if (redPacketMatch) {
+    const redPacketId = String(redPacketMatch[1] || "").trim();
+    if (redPacketId) {
+      // 如果内容是 JSON 字符串，直接返回
+      try {
+        const parsed = JSON.parse(redPacketId);
+        if (parsed.msgType === "redPacket") {
+          return redPacketId;
+        }
+      } catch {
+        // 不是 JSON，是红包ID，转换为 JSON 格式
+        return JSON.stringify({
+          msgType: "redPacket",
+          redPacketId: redPacketId,
+          msg: "红包",
+          money: 0,
+          count: 0,
+          got: 0,
+          type: "random",
+        });
+      }
+    }
+  }
+  return input;
+};
+
+// 处理引用消息内容，转换图片和红包格式
+const processQuotedMessageContent = (content) => {
+  if (!content || typeof content !== 'string') return content;
+  // 先处理红包格式转换
+  let processedContent = convertLegacyRedPacketTags(content);
+  // 再处理图片格式转换
+  processedContent = convertLegacyImageTags(processedContent);
+  return processedContent;
+};
+
+// 检查引用消息是否是红包
+const isQuotedMessageRedPacket = (quotedMessage) => {
+  if (!quotedMessage || !quotedMessage.content) return false;
+  return isRedPacketMessage(quotedMessage.content);
+};
+
+// 检查引用消息是否包含图片
+const isQuotedMessageImage = (quotedMessage) => {
+  if (!quotedMessage || !quotedMessage.content) return false;
+  return isImageInContent(quotedMessage.content);
+};
+
+// 获取处理后的引用消息内容（用于渲染）
+const getProcessedQuotedMessageContent = (quotedMessage) => {
+  if (!quotedMessage || !quotedMessage.content) return '';
+  return processQuotedMessageContent(quotedMessage.content);
+};
+
+// 解析引用消息中的红包（用于在引用消息中显示红包信息）
+const parseQuotedMessageRedPacket = (quotedMessage) => {
+  if (!quotedMessage || !quotedMessage.content) return null;
+  if (!isQuotedMessageRedPacket(quotedMessage)) return null;
+  // 创建一个临时消息对象用于解析红包
+  const tempMessage = {
+    content: quotedMessage.content,
+    oId: quotedMessage.id || 'quoted-' + Date.now(),
+  };
+  return parseRedPacketMessage(tempMessage.content);
 };
 
 // 处理消息撤回
@@ -2773,9 +2879,76 @@ const filterBlacklistMessages = () => {
 .quoted-message-content {
   color: var(--sub-text-color);
   font-size: 12px;
+  overflow: visible;
+  word-wrap: break-word;
+}
+
+/* 引用消息中的红包样式 */
+.quoted-red-packet {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: linear-gradient(135deg, #ff4d4f 0%, #ff7875 100%);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 12px;
+  margin: 4px 0;
+}
+
+.quoted-red-packet-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.quoted-red-packet-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.quoted-red-packet-type {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 2px;
+}
+
+.quoted-red-packet-msg {
+  font-size: 11px;
+  color: #fffbe6;
+  opacity: 0.92;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 引用消息内容主体样式（包含图片和文本） */
+.quoted-message-body {
+  color: var(--sub-text-color);
+  font-size: 12px;
+  line-height: 1.5;
+  word-wrap: break-word;
+  max-height: 120px;
+  overflow: hidden;
+  position: relative;
+}
+
+.quoted-message-body img {
+  max-width: 150px;
+  height: auto;
+  border-radius: 6px;
+  cursor: pointer;
+  display: block;
+  margin: 4px 0;
+}
+
+.quoted-message-body :deep(img) {
+  max-width: 150px;
+  height: auto;
+  border-radius: 6px;
+  cursor: pointer;
+  display: block;
+  margin: 4px 0;
 }
 
 .quoted-image-indicator {

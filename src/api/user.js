@@ -223,4 +223,58 @@ export const userApi = {
 
     return request.upload("/upload", [file]);
   },
+
+  /**
+   * 新增收藏表情包
+   * @param {string} emoticonSrc - 表情包图片URL
+   * @returns {Promise<{code?: number, data?: boolean, message?: string}>}
+   */
+  addEmoticonFavour(emoticonSrc) {
+    // 使用 text/plain Content-Type 发送纯字符串
+    // 根据API要求，请求体应该是纯文本字符串，Content-Type 为 text/plain;charset=UTF-8
+    return request.postText("/api/emoticon_favour/add", emoticonSrc);
+  },
+
+  /**
+   * 删除收藏表情包
+   * @param {string} id - 表情包收藏ID
+   * @returns {Promise<{code?: number, data?: boolean, message?: string}>}
+   */
+  deleteEmoticonFavour(id) {
+    return request.post("/api/emoticon_favour/delete", { id: String(id) });
+  },
+
+  /**
+   * 分页查询收藏表情包列表
+   * @param {Object} params - 分页参数
+   * @param {number} [params.current=1] - 当前页码
+   * @param {number} [params.pageSize=20] - 每页数量
+   * @param {string} [params.sortField] - 排序字段
+   * @param {string} [params.sortOrder] - 排序方式 (asc/desc)
+   * @returns {Promise<{
+   *   code?: number,
+   *   data?: {
+   *     records?: Array<{
+   *       id?: number,
+   *       userId?: number,
+   *       emoticonSrc?: string,
+   *       createTime?: string,
+   *       updateTime?: string
+   *     }>,
+   *     total?: number,
+   *     current?: number,
+   *     size?: number,
+   *     pages?: number
+   *   },
+   *   message?: string
+   * }>}
+   */
+  listEmoticonFavourByPage(params = {}) {
+    return request.post("/api/emoticon_favour/list/page", {
+      current: params.current || 1,
+      pageSize: params.pageSize || 20,
+      sortField: params.sortField,
+      sortOrder: params.sortOrder,
+    });
+  },
 };
