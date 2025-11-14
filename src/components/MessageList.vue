@@ -64,9 +64,7 @@
             <div class="message-header" v-if="item.userName !== userStore.userInfo?.userName">
               <span class="user-nickname">
                 {{
-                  item.userNickname
-                    ? `${item.userNickname} (${item.userName})`
-                    : item.userName
+                  getDisplayName(item)
                 }}
               </span>
               <i v-if="isMentionedMessage(item)" class="fas fa-at mention-icon" title="提到了你"></i>
@@ -276,7 +274,7 @@ import ClientInfo from "./ClientInfo.vue";
 import UserInfoCard from "./UserInfoCard.vue";
 import UserContextMenu from "./UserContextMenu.vue";
 import MsgContextMenu from "./MsgContextMenu.vue";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import RedPacketModal from "./RedPacketModal.vue";
 import { createImagePreviewWindow } from "../utils/imagePreview";
 import wsManager from "../utils/websocket";
@@ -1217,6 +1215,10 @@ function handleContextMenuAction(type) {
     addToBlacklist(contextMenuUser.value, contextMenuUserAvatar.value);
     return;
   }
+  if (type === "remark") {
+    editRemark(contextMenuUser.value);
+    return;
+  }
   if (type === "message") {
     handleUserMessage(contextMenuUser.value);
   } else if (type === "at") {
@@ -1280,6 +1282,10 @@ function onMsgContextMenu(e, item) {
       ...(canRevokeMessage(item)
         ? [{ label: "撤回", action: "revoke", icon: "fas fa-undo" }]
         : []),
+      ...(isSelf ? [] : [
+        { divider: true },
+        { label: "修改备注", action: "remark", icon: "fas fa-edit" },
+      ]),
       { label: "加入黑名单", action: "blacklist", icon: "fas fa-user-slash" },
     ];
   } else {
@@ -1294,6 +1300,10 @@ function onMsgContextMenu(e, item) {
       ...(canRevokeMessage(item)
         ? [{ label: "撤回", action: "revoke", icon: "fas fa-undo" }]
         : []),
+      ...(isSelf ? [] : [
+        { divider: true },
+        { label: "修改备注", action: "remark", icon: "fas fa-edit" },
+      ]),
       { label: "加入黑名单", action: "blacklist", icon: "fas fa-user-slash" },
     ];
   }
@@ -1350,6 +1360,8 @@ function handleMsgContextMenuAction(type) {
           });
       }
     }
+  } else if (type === "remark") {
+    editRemark(item.userName);
   } else if (type === "blacklist") {
     addToBlacklist(item.userName, item.userAvatarURL48);
   }
@@ -1737,6 +1749,8 @@ const userContextMenuItems = computed(() => [
   // { label: "发送消息", action: "message", icon: "fas fa-comment-dots" },
   { label: "@TA", action: "at", icon: "fas fa-at" },
   { divider: true },
+  { label: "修改备注", action: "remark", icon: "fas fa-edit" },
+  { divider: true },
   // { label: "查看资料", action: "profile", icon: "fas fa-user" },
   { label: "加入黑名单", action: "blacklist", icon: "fas fa-user-slash" },
 ]);
@@ -1784,6 +1798,80 @@ const filterBlacklistMessages = () => {
 
   // 通过emit通知父组件更新消息列表
   emit("update-messages", filteredMessages);
+};
+
+// 备注相关
+// 获取用户的备注
+const getUserRemark = (userName) => {
+  const currentUser = userStore.userInfo?.userName;
+  if (!currentUser) return null;
+  const allRemarks = utools.dbStorage.getItem("fishpi_remarks") || {};
+  const remarks = allRemarks[currentUser] || {};
+  return remarks[userName] || null;
+};
+
+// 保存用户备注
+const saveUserRemark = (userName, remark) => {
+  const currentUser = userStore.userInfo?.userName;
+  if (!currentUser) return;
+  const allRemarks = utools.dbStorage.getItem("fishpi_remarks") || {};
+  if (!allRemarks[currentUser]) {
+    allRemarks[currentUser] = {};
+  }
+  if (remark && remark.trim()) {
+    allRemarks[currentUser][userName] = remark.trim();
+  } else {
+    // 如果备注为空，删除备注
+    delete allRemarks[currentUser][userName];
+  }
+  utools.dbStorage.setItem("fishpi_remarks", allRemarks);
+};
+
+// 获取显示名称（如果有备注则显示：用户名 (备注)，如果有昵称但没有备注则显示：昵称，否则只显示用户名）
+const getDisplayName = (item) => {
+  const remark = getUserRemark(item.userName);
+  if (remark) {
+    // 有备注：用户名 (备注)
+    return `${item.userName} (${remark})`;
+  }
+  if (item.userNickname) {
+    // 有昵称但没有备注：只显示昵称
+    return item.userNickname;
+  }
+  // 没有备注也没有昵称：只显示用户名，不显示括号
+  return item.userName;
+};
+
+// 编辑备注
+const editRemark = (userName) => {
+  const currentRemark = getUserRemark(userName);
+  ElMessageBox.prompt(
+    `请输入 ${userName} 的备注`,
+    "修改备注",
+    {
+      confirmButtonText: "确定",
+      cancelButtonText: "取消",
+      inputValue: currentRemark || "",
+      inputPlaceholder: "留空则删除备注",
+      inputValidator: (value) => {
+        if (value && value.trim().length > 20) {
+          return "备注长度不能超过20个字符";
+        }
+        return true;
+      },
+    }
+  )
+    .then(({ value }) => {
+      saveUserRemark(userName, value);
+      if (value && value.trim()) {
+        ElMessage.success("备注已保存");
+      } else {
+        ElMessage.success("备注已删除");
+      }
+    })
+    .catch(() => {
+      // 用户取消操作，不处理
+    });
 };
 </script>
 
