@@ -54,6 +54,7 @@
         <!-- 消息内容 -->
         <div v-else class="message-row" :class="{
           'message-row-self': item.userName === userStore.userInfo?.userName,
+          'message-row-mentioned': isMentionedMessage(item),
         }">
           <img :src="item.userAvatarURL48" alt="avatar" class="message-avatar"
             @click="openUserInfoCard(item.userId, item.userName, $event)" @contextmenu.prevent="
@@ -68,6 +69,7 @@
                     : item.userName
                 }}
               </span>
+              <i v-if="isMentionedMessage(item)" class="fas fa-at mention-icon" title="提到了你"></i>
             </div>
             <div class="message-content" @click="
               (e) => {
@@ -469,6 +471,30 @@ watch(
       // 获取新增的消息
       const newMsg = newMessages[newMessages.length - 1];
       bells.value = getBells();
+      
+      // 检查所有新增的非历史消息是否@了当前用户或包含关键词
+      const oldMessageIds = new Set(oldMessages.map(msg => msg.oId || msg.id));
+      const realNewMessages = newMessages.filter(msg => 
+        !oldMessageIds.has(msg.oId || msg.id) && 
+        !msg.isHistory && 
+        !msg.isSelf &&
+        msg.type !== "barrager"
+      );
+      
+      // 检查关键词和@用户提醒
+      realNewMessages.forEach(msg => {
+        // 检查关键词提醒
+        if (checkBellsInMessage(msg.md || msg.content || '', bells.value)) {
+          utools.showNotification(`有人提了关键词`, 'fishpi');
+        }
+        
+        // 检查是否@了当前用户
+        if (checkMentionedUser(msg)) {
+          const senderName = msg.userNickname || msg.userName || '有人';
+          utools.showNotification(`${senderName} @了你`, 'fishpi');
+        }
+      });
+      
       // 如果是弹幕消息，直接处理并返回，不进行后续处理
       if (newMsg.type === "barrager") {
         handleBarrager(newMsg);
@@ -574,8 +600,6 @@ watch(
             }
           }
         });
-      checkBellsInMessage(newMsg.md, bells.value) && utools.showNotification(`有人提了关键词`)
-
       });
     }
   },
@@ -1650,6 +1674,53 @@ const checkBellsInMessage = (mainString, elementsArray) => {
   return foundElements.length > 0;
 }
 
+// 检查消息中是否@了当前用户
+const checkMentionedUser = (message) => {
+  // 如果是自己发送的消息，不检测
+  if (message.isSelf) {
+    return false;
+  }
+  
+  // 获取当前用户名
+  const currentUserName = userStore.userInfo?.userName;
+  if (!currentUserName) {
+    return false;
+  }
+  
+  // 优先使用md（原始Markdown内容），如果没有则使用content
+  // 对于content，需要移除HTML标签来获取纯文本
+  let messageContent = message.md || '';
+  
+  // 如果没有md，使用content并移除HTML标签
+  if (!messageContent && message.content) {
+    // 创建一个临时div来解析HTML并获取文本内容
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = message.content;
+    messageContent = tempDiv.textContent || tempDiv.innerText || '';
+  }
+  
+  if (!messageContent) {
+    return false;
+  }
+  
+  // 转义用户名中的特殊字符，用于正则表达式
+  const escapedUserName = currentUserName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  
+  // 检查是否包含@当前用户名
+  // 支持多种格式：
+  // - @用户名（后面跟空格、标点、换行或字符串结尾）
+  // - @用户名（独立出现，后面不是字母数字下划线）
+  // 使用更精确的匹配模式
+  const mentionPattern = new RegExp(`@${escapedUserName}(?![a-zA-Z0-9_])`, 'i');
+  
+  return mentionPattern.test(messageContent);
+}
+
+// 判断消息是否@了当前用户（用于样式显示）
+const isMentionedMessage = (message) => {
+  return checkMentionedUser(message);
+}
+
 onMounted(() => {
   bells.value = getBells();
   scrollToBottom();
@@ -1742,6 +1813,52 @@ const filterBlacklistMessages = () => {
   margin-bottom: 8px;
 }
 
+/* @用户消息的高亮样式 */
+.message-row-mentioned {
+  animation: mention-pulse 1.5s ease-in-out;
+}
+
+.message-row-mentioned .message-bubble {
+  position: relative;
+}
+
+.message-row-mentioned .message-text {
+  border-left: 3px solid #ff6b6b;
+  background-color: rgba(255, 107, 107, 0.08);
+  box-shadow: 0 2px 8px rgba(255, 107, 107, 0.2);
+  transition: all 0.3s ease;
+}
+
+.message-row-self.message-row-mentioned .message-text {
+  border-left: none;
+  border-right: 3px solid #ff6b6b;
+  background-color: rgba(255, 107, 107, 0.12);
+}
+
+.message-row-mentioned:hover .message-text {
+  background-color: rgba(255, 107, 107, 0.12);
+  box-shadow: 0 3px 12px rgba(255, 107, 107, 0.3);
+}
+
+.message-row-self.message-row-mentioned:hover .message-text {
+  background-color: rgba(255, 107, 107, 0.16);
+}
+
+@keyframes mention-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.01);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 .message-avatar {
   width: 40px;
   height: 40px;
@@ -1783,6 +1900,27 @@ const filterBlacklistMessages = () => {
   color: var(--text-color);
   margin: 0 6px;
   font-size: 13px;
+}
+
+.mention-icon {
+  color: #ff6b6b;
+  font-size: 14px;
+  margin-left: 4px;
+  animation: mention-icon-bounce 2s ease-in-out infinite;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes mention-icon-bounce {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.9;
+  }
 }
 
 .message-content {
